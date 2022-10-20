@@ -666,6 +666,27 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte) (gInfo sdk.GasInfo, re
 		return sdk.GasInfo{}, nil, nil, err
 	}
 
+	// Create a new Context based off of the existing Context with a MultiStore branch
+	// in case message processing fails. At this point, the MultiStore
+	// is a branch of a branch.
+	runMsgCtx, msCache := app.cacheTxContext(ctx, txBytes)
+
+	// Attempt to execute all messages and only update state if all messages pass
+	// and we're in DeliverTx. Note, runMsgs will never return a reference to a
+	// Result if any single message fails or does not have a registered Handler.
+	result, err = app.runMsgs(runMsgCtx, msgs, mode)
+	if err == nil && mode == runTxModeDeliver {
+		// When block gas exceeds, it'll panic and won't commit the cached store.
+		consumeBlockGas()
+
+		msCache.Write()
+
+		if len(anteEvents) > 0 {
+			// append the events in the order of occurrence
+			result.Events = append(anteEvents, result.Events...)
+		}
+	}
+
 	if app.anteHandler != nil {
 		var (
 			anteCtx sdk.Context
@@ -704,27 +725,6 @@ func (app *BaseApp) runTx(mode runTxMode, txBytes []byte) (gInfo sdk.GasInfo, re
 
 		msCache.Write()
 		anteEvents = events.ToABCIEvents()
-	}
-
-	// Create a new Context based off of the existing Context with a MultiStore branch
-	// in case message processing fails. At this point, the MultiStore
-	// is a branch of a branch.
-	runMsgCtx, msCache := app.cacheTxContext(ctx, txBytes)
-
-	// Attempt to execute all messages and only update state if all messages pass
-	// and we're in DeliverTx. Note, runMsgs will never return a reference to a
-	// Result if any single message fails or does not have a registered Handler.
-	result, err = app.runMsgs(runMsgCtx, msgs, mode)
-	if err == nil && mode == runTxModeDeliver {
-		// When block gas exceeds, it'll panic and won't commit the cached store.
-		consumeBlockGas()
-
-		msCache.Write()
-
-		if len(anteEvents) > 0 {
-			// append the events in the order of occurrence
-			result.Events = append(anteEvents, result.Events...)
-		}
 	}
 
 	return gInfo, result, anteEvents, err
