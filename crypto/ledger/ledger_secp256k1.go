@@ -274,7 +274,7 @@ func getPubKeyUnsafe(device SECP256K1, path hd.BIP44Params) (types.PubKey, error
 		return nil, "", fmt.Errorf("error parsing ecdsa public key: %v", err1)
 	}
 
-	return &ethsecp256k1.PubKey{Key: ethcrypto.CompressPubkey(ecdsaPub)}, addr, nil
+	return &ethsecp256k1.PubKey{Key: ethcrypto.CompressPubkey(ecdsaPub)}, nil
 }
 
 // getPubKeyAddr reads the pubkey and the address from a ledger device.
