@@ -12,6 +12,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/crypto/types"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	ethsecp256k1 "github.com/evmos/ethermint/crypto/ethsecp256k1"
 )
 
 // discoverLedger defines a function to be invoked at runtime for discovering
@@ -267,7 +269,12 @@ func getPubKeyUnsafe(device SECP256K1, path hd.BIP44Params) (types.PubKey, error
 	compressedPublicKey := make([]byte, secp256k1.PubKeySize)
 	copy(compressedPublicKey, cmp.SerializeCompressed())
 
-	return &secp256k1.PubKey{Key: compressedPublicKey}, nil
+	ecdsaPub, err := ethcrypto.DecompressPubkey(compressedPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing ecdsa public key: %v", err)
+	}
+
+	return &ethsecp256k1.PubKey{Key: ethcrypto.CompressPubkey(ecdsaPub)}, nil
 }
 
 // getPubKeyAddr reads the pubkey and the address from a ledger device.
@@ -291,5 +298,10 @@ func getPubKeyAddrSafe(device SECP256K1, path hd.BIP44Params, hrp string) (types
 	compressedPublicKey := make([]byte, secp256k1.PubKeySize)
 	copy(compressedPublicKey, cmp.SerializeCompressed())
 
-	return &secp256k1.PubKey{Key: compressedPublicKey}, addr, nil
+	ecdsaPub, err := ethcrypto.DecompressPubkey(compressedPublicKey)
+	if err != nil {
+		return nil, "", fmt.Errorf("error parsing ecdsa public key: %v", err)
+	}
+
+	return &ethsecp256k1.PubKey{Key: ethcrypto.CompressPubkey(ecdsaPub)}, addr, nil
 }
