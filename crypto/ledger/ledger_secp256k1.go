@@ -269,9 +269,9 @@ func getPubKeyUnsafe(device SECP256K1, path hd.BIP44Params) (types.PubKey, error
 	compressedPublicKey := make([]byte, secp256k1.PubKeySize)
 	copy(compressedPublicKey, cmp.SerializeCompressed())
 
-	ecdsaPub, err1 := ethcrypto.DecompressPubkey(compressedPublicKey)
-	if err1 != nil {
-		return nil, fmt.Errorf("error parsing ecdsa public key: %v", err1)
+	ecdsaPub, err := ethcrypto.DecompressPubkey(compressedPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing ecdsa public key: %v", err)
 	}
 
 	return &ethsecp256k1.PubKey{Key: ethcrypto.CompressPubkey(ecdsaPub)}, nil
@@ -298,9 +298,9 @@ func getPubKeyAddrSafe(device SECP256K1, path hd.BIP44Params, hrp string) (types
 	compressedPublicKey := make([]byte, secp256k1.PubKeySize)
 	copy(compressedPublicKey, cmp.SerializeCompressed())
 
-	ecdsaPub, err1 := ethcrypto.DecompressPubkey(compressedPublicKey)
-	if err1 != nil {
-		return nil, "", fmt.Errorf("error parsing ecdsa public key: %v", err1)
+	ecdsaPub, err := ethcrypto.DecompressPubkey(compressedPublicKey)
+	if err != nil {
+		return nil, "", fmt.Errorf("error parsing ecdsa public key: %v", err)
 	}
 
 	return &ethsecp256k1.PubKey{Key: ethcrypto.CompressPubkey(ecdsaPub)}, addr, nil
