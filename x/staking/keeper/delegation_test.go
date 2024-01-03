@@ -846,3 +846,47 @@ func (s *KeeperTestSuite) TestRedelegateFromUnbondedValidator() {
 	red, found := keeper.GetRedelegation(ctx, addrDels[0], addrVals[0], addrVals[1])
 	require.False(found, "%v", red)
 }
+
+func (s *KeeperTestSuite) TestUndelegateWithDustShare() {
+	ctx, keeper := s.ctx, s.stakingKeeper
+	require := s.Require()
+
+	addrDels, valAddrs := createValAddrs(2)
+
+	// construct the validators[0] & slash 1stake
+	amt := math.NewInt(100)
+	validator := testutil.NewValidator(s.T(), valAddrs[0], PKs[0])
+	validator, _ = validator.AddTokensFromDel(amt)
+	validator = validator.RemoveTokens(math.NewInt(1))
+	validator = stakingkeeper.TestingUpdateValidator(keeper, ctx, validator, true)
+
+	// first add a validators[0] to delegate too
+	bond1to1 := stakingtypes.NewDelegation(addrDels[0], valAddrs[0], math.LegacyNewDec(100))
+	keeper.SetDelegation(ctx, bond1to1)
+	resBond, found := keeper.GetDelegation(ctx, addrDels[0], valAddrs[0])
+	require.True(found)
+	require.Equal(bond1to1, resBond)
+
+	// second delegators[1] add a validators[0] to delegate
+	bond2to1 := stakingtypes.NewDelegation(addrDels[1], valAddrs[0], math.LegacyNewDec(1))
+	validator, delegatorShare := validator.AddTokensFromDel(math.NewInt(1))
+	bond2to1.Shares = delegatorShare
+	_ = stakingkeeper.TestingUpdateValidator(keeper, ctx, validator, true)
+	keeper.SetDelegation(ctx, bond2to1)
+	resBond, found = keeper.GetDelegation(ctx, addrDels[1], valAddrs[0])
+	require.True(found)
+	require.Equal(bond2to1, resBond)
+
+	// check delegation state
+	delegations := keeper.GetValidatorDelegations(ctx, valAddrs[0])
+	require.Equal(2, len(delegations))
+
+	// undelegate all delegator[0]'s delegate
+	_, err := s.msgServer.Undelegate(ctx, stakingtypes.NewMsgUndelegate(addrDels[0], valAddrs[0], sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(99))))
+	require.NoError(err)
+
+	// remain only delegator[1]'s delegate
+	delegations = keeper.GetValidatorDelegations(ctx, valAddrs[0])
+	require.Equal(1, len(delegations))
+	require.Equal(delegations[0].DelegatorAddress, addrDels[1].String())
+}
