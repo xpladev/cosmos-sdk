@@ -9,6 +9,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/simapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/x/staking"
 	"github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	"github.com/cosmos/cosmos-sdk/x/staking/teststaking"
 	"github.com/cosmos/cosmos-sdk/x/staking/types"
@@ -989,4 +990,49 @@ func TestRedelegateFromUnbondedValidator(t *testing.T) {
 	// no red should have been found
 	red, found := app.StakingKeeper.GetRedelegation(ctx, addrDels[0], addrVals[0], addrVals[1])
 	require.False(t, found, "%v", red)
+}
+
+func TestUndelegateWithDustShare(t *testing.T) {
+	_, app, ctx := createTestInput()
+	sh := staking.NewHandler(app.StakingKeeper)
+
+	addrDels := simapp.AddTestAddrsIncremental(app, ctx, 2, sdk.NewInt(0))
+	addrVals := simapp.ConvertAddrsToValAddrs(addrDels)
+
+	// construct the validators[0] & slash 1stake
+	amt := sdk.NewInt(100)
+	validator := teststaking.NewValidator(t, addrVals[0], PKs[0])
+	validator, _ = validator.AddTokensFromDel(amt)
+	validator = validator.RemoveTokens(sdk.NewInt(1))
+	validator = keeper.TestingUpdateValidator(app.StakingKeeper, ctx, validator, true)
+
+	// first add a validators[0] to delegate too
+	bond1to1 := types.NewDelegation(addrDels[0], addrVals[0], sdk.NewDec(100))
+	app.StakingKeeper.SetDelegation(ctx, bond1to1)
+	resBond, found := app.StakingKeeper.GetDelegation(ctx, addrDels[0], addrVals[0])
+	require.True(t, found)
+	require.Equal(t, bond1to1, resBond)
+
+	// second delegators[1] add a validators[0] to delegate
+	bond2to1 := types.NewDelegation(addrDels[1], addrVals[0], sdk.NewDec(1))
+	validator, delegatorShare := validator.AddTokensFromDel(sdk.NewInt(1))
+	bond2to1.Shares = delegatorShare
+	_ = keeper.TestingUpdateValidator(app.StakingKeeper, ctx, validator, true)
+	app.StakingKeeper.SetDelegation(ctx, bond2to1)
+	resBond, found = app.StakingKeeper.GetDelegation(ctx, addrDels[1], addrVals[0])
+	require.True(t, found)
+	require.Equal(t, bond2to1, resBond)
+
+	// check delegation state
+	delegations := app.StakingKeeper.GetValidatorDelegations(ctx, addrVals[0])
+	require.Equal(t, 2, len(delegations))
+
+	// undelegate all delegator[0]'s delegate
+	_, err := sh(ctx, types.NewMsgUndelegate(addrDels[0], addrVals[0], sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(99))))
+	require.NoError(t, err)
+
+	// remain only delegator[1]'s delegate
+	delegations = app.StakingKeeper.GetValidatorDelegations(ctx, addrVals[0])
+	require.Equal(t, 1, len(delegations))
+	require.Equal(t, delegations[0].DelegatorAddress, addrDels[1].String())
 }
