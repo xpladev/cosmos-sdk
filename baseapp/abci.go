@@ -14,6 +14,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	abci "github.com/tendermint/tendermint/abci/types"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
+	tmcore "github.com/tendermint/tendermint/rpc/core"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
@@ -693,6 +694,18 @@ func (app *BaseApp) createQueryContext(height int64, prove bool) (sdk.Context, e
 		if ok {
 			cInfo, err := rms.GetCommitInfo(height)
 			if cInfo != nil && err == nil {
+				if cInfo.Timestamp.IsZero() {
+					block, err := tmcore.Block(nil, &height)
+					if err != nil {
+						return sdk.Context{},
+							sdkerrors.Wrapf(
+								sdkerrors.ErrInvalidRequest,
+								"failed to load block at height %d; %s", height, err,
+							)
+					}
+					cInfo.Timestamp = block.Block.Time
+				}
+
 				ctx = ctx.WithBlockTime(cInfo.Timestamp)
 			}
 		}
