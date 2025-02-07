@@ -33,7 +33,8 @@ const (
 	QueryPathP2P    = "p2p"
 	QueryPathStore  = "store"
 
-	QueryPathBroadcastTx = "/cosmos.tx.v1beta1.Service/BroadcastTx"
+	QueryPathBroadcastTx      = "/cosmos.tx.v1beta1.Service/BroadcastTx"
+	QueryPathGetBlockByHeight = "/cosmos.base.tendermint.v1beta1.Service/GetBlockByHeight"
 )
 
 func (app *BaseApp) InitChain(req *abci.RequestInitChain) (*abci.ResponseInitChain, error) {
@@ -1242,6 +1243,39 @@ func (app *BaseApp) CreateQueryContext(height int64, prove bool) (sdk.Context, e
 		if ok {
 			cInfo, err := rms.GetCommitInfo(height)
 			if cInfo != nil && err == nil {
+				if cInfo.Timestamp.IsZero() {
+
+					reqGetBlockHeight := GetBlockByHeightRequest{
+						Height: height,
+					}
+
+					getBlockHeightBz, err := reqGetBlockHeight.Marshal()
+					if err != nil {
+						return sdk.Context{}, err
+					}
+
+					req := abci.RequestQuery{
+						Path: QueryPathGetBlockByHeight,
+						Data: getBlockHeightBz,
+					}
+					resp, err := app.Query(ctx, &req)
+					if err != nil || resp.Code != 0 {
+						return sdk.Context{},
+							errorsmod.Wrapf(
+								sdkerrors.ErrInvalidRequest,
+								"failed to load block at height %d; %s", height, err,
+							)
+					}
+
+					respGetBlockHeight := &GetBlockByHeightResponse{}
+					err = respGetBlockHeight.Unmarshal(resp.Value)
+					if err != nil {
+						return sdk.Context{}, err
+					}
+
+					cInfo.Timestamp = respGetBlockHeight.SdkBlock.Header.Time
+				}
+
 				ctx = ctx.WithBlockTime(cInfo.Timestamp)
 			}
 		}
