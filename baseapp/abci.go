@@ -20,6 +20,8 @@ import (
 	snapshottypes "cosmossdk.io/store/snapshots/types"
 	storetypes "cosmossdk.io/store/types"
 
+	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/client/config"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/telemetry"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -1274,6 +1276,24 @@ func (app *BaseApp) CreateQueryContext(height int64, prove bool) (sdk.Context, e
 					}
 
 					cInfo.Timestamp = respGetBlockHeight.SdkBlock.Header.Time
+					////////
+					clientCtx := client.Context{}
+					clientCtx, err = config.ReadFromClientConfig(clientCtx)
+					if err != nil {
+						return sdk.Context{}, err
+					}
+
+					node, err := clientCtx.GetNode()
+					if err != nil {
+						return sdk.Context{}, err
+					}
+
+					resBlock, err := node.Block(context.Background(), &height)
+					if err != nil {
+						return sdk.Context{}, err
+					}
+					cInfo.Timestamp = resBlock.Block.Time
+					////////
 				}
 
 				ctx = ctx.WithBlockTime(cInfo.Timestamp)
