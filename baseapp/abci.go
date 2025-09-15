@@ -10,6 +10,7 @@ import (
 	"github.com/cockroachdb/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/cosmos/gogoproto/proto"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -20,6 +21,7 @@ import (
 	snapshottypes "cosmossdk.io/store/snapshots/types"
 	storetypes "cosmossdk.io/store/types"
 
+	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/telemetry"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -1290,6 +1292,25 @@ func (app *BaseApp) CreateQueryContextWithCheckHeader(height int64, prove, check
 		if ok {
 			cInfo, err := rms.GetCommitInfo(height)
 			if cInfo != nil && err == nil {
+				if cInfo.Timestamp.IsZero() {
+					var rpcnode client.CometRPC
+					nodeURI := "tcp://127.0.0.1:26657"
+					rpcnode, err = rpchttp.New(nodeURI, "/websocket")
+					if err != nil {
+						return sdk.Context{}, errorsmod.Wrapf(
+							sdkerrors.ErrInvalidRequest,
+							"failed to create rpcnode %s; %s", nodeURI, err,
+						)
+					}
+					resBlock, err := rpcnode.Block(context.Background(), &height)
+					if err != nil {
+						return sdk.Context{}, errorsmod.Wrapf(
+							sdkerrors.ErrInvalidRequest,
+							"failed to load block at height %d; %s", height, err,
+						)
+					}
+					cInfo.Timestamp = resBlock.Block.Time
+				}
 				ctx = ctx.WithBlockHeight(height).WithBlockTime(cInfo.Timestamp)
 			}
 		}
