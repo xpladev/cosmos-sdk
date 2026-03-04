@@ -1297,19 +1297,15 @@ func (app *BaseApp) CreateQueryContextWithCheckHeader(height int64, prove, check
 					nodeURI := "tcp://127.0.0.1:26657"
 					rpcnode, err = rpchttp.New(nodeURI, "/websocket")
 					if err != nil {
-						return sdk.Context{}, errorsmod.Wrapf(
-							sdkerrors.ErrInvalidRequest,
-							"failed to create rpcnode %s; %s", nodeURI, err,
-						)
+						app.logger.Debug("failed to create rpcnode:", nodeURI, ", height:", height, ", err:", err)
+					} else {
+						resBlock, err := rpcnode.Block(context.Background(), &height)
+						if err != nil {
+							app.logger.Debug("failed to load block height:", height, ", err:", err)
+						} else if resBlock != nil && resBlock.Block != nil {
+							cInfo.Timestamp = resBlock.Block.Time
+						}
 					}
-					resBlock, err := rpcnode.Block(context.Background(), &height)
-					if err != nil {
-						return sdk.Context{}, errorsmod.Wrapf(
-							sdkerrors.ErrInvalidRequest,
-							"failed to load block at height %d; %s", height, err,
-						)
-					}
-					cInfo.Timestamp = resBlock.Block.Time
 				}
 				ctx = ctx.WithBlockHeight(height).WithBlockTime(cInfo.Timestamp)
 			}
