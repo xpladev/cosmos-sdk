@@ -1429,11 +1429,11 @@ func (bapp *BaseApp) CreateQueryContextWithCheckHeader(height int64, prove, chec
 					nodeURI := "tcp://127.0.0.1:26657"
 					rpcnode, err = rpchttp.New(nodeURI, "/websocket")
 					if err != nil {
-						app.logger.Debug("failed to create rpcnode:", nodeURI, ", height:", height, ", err:", err)
+						bapp.logger.Debug("failed to create rpcnode:", nodeURI, ", height:", height, ", err:", err)
 					} else {
 						resBlock, err := rpcnode.Block(context.Background(), &height)
 						if err != nil {
-							app.logger.Debug("failed to load block height:", height, ", err:", err)
+							bapp.logger.Debug("failed to load block height:", height, ", err:", err)
 						} else if resBlock != nil && resBlock.Block != nil {
 							cInfo.Timestamp = resBlock.Block.Time
 						}
